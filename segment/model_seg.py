@@ -4,7 +4,6 @@ import numpy as np
 import tensorflow as tf
 import matplotlib.pyplot as plt
 
-
 print(f'Tensorflow version {tf.__version__}')
 print(f'GPU is {"ON" if tf.config.list_physical_devices("GPU") else "OFF" }')
 
