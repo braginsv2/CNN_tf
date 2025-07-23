@@ -17,6 +17,7 @@ from tensorflow.keras.callbacks import ModelCheckpoint, EarlyStopping, ReduceLRO
 from tensorflow.keras.utils import to_categorical
 from tensorflow.keras.preprocessing.image import ImageDataGenerator
 
+
 # Фиксируем семена
 np.random.seed(42)
 tf.random.set_seed(42)
