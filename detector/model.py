@@ -23,7 +23,118 @@ import tensorflow.keras.backend as K
 np.random.seed(42)
 tf.random.set_seed(42)
 
-
+def parse_coco_annotations(annotations_file, images_dir):
+    """
+    Парсит COCO аннотации и извлекает bounding boxes.
+    Также находит изображения без аннотаций (считает их как "без кружек")
+    """
+    print("📋 ПАРСИНГ COCO АННОТАЦИЙ И ПОИСК ВСЕХ ИЗОБРАЖЕНИЙ")
+    print("="*50)
+    
+    # Загружаем COCO данные
+    with open(annotations_file, 'r') as f:
+        coco_data = json.load(f)
+    
+    # Создаем словари для быстрого поиска
+    images_dict = {img['id']: img for img in coco_data['images']}
+    coco_filenames = {img['file_name'] for img in coco_data['images']}
+    
+    # Группируем аннотации по изображениям
+    annotations_by_image = {}
+    for ann in coco_data['annotations']:
+        image_id = ann['image_id']
+        if image_id not in annotations_by_image:
+            annotations_by_image[image_id] = []
+        annotations_by_image[image_id].append(ann)
+    
+    # Находим ВСЕ изображения в папке
+    all_image_files = set()
+    for ext in ['*.jpg', '*.jpeg', '*.png', '*.bmp']:
+        files = glob(os.path.join(images_dir, ext))
+        files.extend(glob(os.path.join(images_dir, ext.upper())))
+        for f in files:
+            all_image_files.add(os.path.basename(f))
+    
+    print(f"Всего файлов в папке: {len(all_image_files)}")
+    print(f"Файлов в COCO аннотациях: {len(coco_filenames)}")
+    
+    # Подготавливаем данные
+    image_data = []
+    
+    # Сначала обрабатываем изображения С аннотациями
+    for image_id, img_info in images_dict.items():
+        file_path = os.path.join(images_dir, img_info['file_name'])
+        
+        if not os.path.exists(file_path):
+            continue
+            
+        # Получаем размеры изображения
+        img_width = img_info['width']
+        img_height = img_info['height']
+        
+        if image_id in annotations_by_image:
+            # Есть кружки - берем первую аннотацию
+            ann = annotations_by_image[image_id][0]
+            bbox = ann['bbox']  # [x, y, width, height]
+            
+            # COCO формат: [x_top_left, y_top_left, width, height]
+            # Нормализуем координаты
+            x = bbox[0] / img_width
+            y = bbox[1] / img_height
+            w = bbox[2] / img_width
+            h = bbox[3] / img_height
+            
+            # Конвертируем в центральные координаты
+            center_x = x + w / 2
+            center_y = y + h / 2
+            
+            image_data.append({
+                'file_name': img_info['file_name'],
+                'file_path': file_path,
+                'has_cup': 1,
+                'bbox': [center_x, center_y, w, h],
+                'original_size': [img_width, img_height]
+            })
+    
+    # Теперь обрабатываем изображения БЕЗ аннотаций
+    files_without_annotations = all_image_files - coco_filenames
+    print(f"Файлов без аннотаций (считаем как 'без кружек'): {len(files_without_annotations)}")
+    
+    for filename in files_without_annotations:
+        file_path = os.path.join(images_dir, filename)
+        
+        if os.path.exists(file_path):
+            try:
+                # Получаем размеры изображения
+                img = cv2.imread(file_path)
+                if img is not None:
+                    img_height, img_width = img.shape[:2]
+                    
+                    image_data.append({
+                        'file_name': filename,
+                        'file_path': file_path,
+                        'has_cup': 0,
+                        'bbox': [0.0, 0.0, 0.0, 0.0],  # Нулевой bbox для "нет объекта"
+                        'original_size': [img_width, img_height]
+                    })
+            except Exception as e:
+                print(f"⚠️ Ошибка чтения {filename}: {e}")
+                continue
+    
+    # Статистика
+    with_cups = sum(1 for item in image_data if item['has_cup'] == 1)
+    without_cups = len(image_data) - with_cups
+    
+    print(f"\n📊 ИТОГОВАЯ СТАТИСТИКА:")
+    print(f"Всего изображений для обучения: {len(image_data)}")
+    print(f"С кружками (из COCO): {with_cups}")
+    print(f"Без кружек (без аннотаций): {without_cups}")
+    
+    if without_cups == 0:
+        print("⚠️ ВНИМАНИЕ: Не найдено изображений без кружек!")
+        print("   Убедитесь, что в папке есть изображения без аннотаций")
+    
+    return image_data
 
 def enhanced_preprocessing_detection(image_path, target_size=(224, 224)):
     """
@@ -704,3 +815,4 @@ if __name__ == "__main__":
     print("2. Предобработайте изображение функцией enhanced_preprocessing_detection()")
     print("3. Получите предсказания: model.predict(image)")
     print("4. Результат: [classification_confidence, [center_x, center_y, width, height]]")
+
