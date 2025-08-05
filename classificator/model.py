@@ -22,91 +22,6 @@ from tensorflow.keras.preprocessing.image import ImageDataGenerator
 np.random.seed(42)
 tf.random.set_seed(42)
 
-def deep_data_analysis(images_dir="train", annotations_file="train/_annotations.coco.json"):
-    """
-    Глубокий анализ данных для выявления проблем
-    """
-    print("🔬 ГЛУБОКИЙ АНАЛИЗ ДАННЫХ")
-    print("="*50)
-    
-    # Загружаем COCO данные
-    with open(annotations_file, 'r') as f:
-        coco_data = json.load(f)
-    
-    # Получаем все файлы
-    all_files = set()
-    for ext in ['*.jpg', '*.jpeg', '*.png', '*.bmp']:
-        files = glob(os.path.join(images_dir, ext))
-        files.extend(glob(os.path.join(images_dir, ext.upper())))
-        for f in files:
-            all_files.add(os.path.basename(f))
-    
-    # Анализ COCO данных
-    coco_files = set(img['file_name'] for img in coco_data['images'])
-    annotated_ids = set(ann['image_id'] for ann in coco_data['annotations'])
-    
-    # Файлы с аннотациями (кружки)
-    files_with_cups = set()
-    for img in coco_data['images']:
-        if img['id'] in annotated_ids:
-            files_with_cups.add(img['file_name'])
-    
-    # Файлы без кружек
-    files_without_cups = all_files - coco_files
-    
-    print(f"📊 Статистика файлов:")
-    print(f"  Всего файлов: {len(all_files)}")
-    print(f"  Файлов в COCO: {len(coco_files)}")
-    print(f"  Файлов с кружками: {len(files_with_cups)}")
-    print(f"  Файлов без кружек: {len(files_without_cups)}")
-    
-    # Анализ размеров изображений
-    def analyze_image_properties(file_list, label):
-        print(f"\n🖼️ Анализ изображений ({label}):")
-        
-        sizes = []
-        channels = []
-        brightness = []
-        
-        sample_files = list(file_list)[:50]  # Анализируем первые 50
-        
-        for filename in sample_files:
-            image_path = os.path.join(images_dir, filename)
-            if os.path.exists(image_path):
-                img = cv2.imread(image_path)
-                if img is not None:
-                    h, w, c = img.shape
-                    sizes.append((w, h))
-                    channels.append(c)
-                    brightness.append(np.mean(img))
-        
-        if sizes:
-            widths, heights = zip(*sizes)
-            print(f"  Количество проанализированных: {len(sizes)}")
-            print(f"  Размеры (ширина): мин={min(widths)}, макс={max(widths)}, среднее={np.mean(widths):.1f}")
-            print(f"  Размеры (высота): мин={min(heights)}, макс={max(heights)}, среднее={np.mean(heights):.1f}")
-            print(f"  Яркость: мин={min(brightness):.1f}, макс={max(brightness):.1f}, среднее={np.mean(brightness):.1f}")
-        
-        return sizes, brightness
-    
-    cup_stats = analyze_image_properties(files_with_cups, "с кружками")
-    no_cup_stats = analyze_image_properties(files_without_cups, "без кружек")
-    
-    # Сравнение яркости между классами
-    if cup_stats[1] and no_cup_stats[1]:
-        cup_brightness = np.mean(cup_stats[1])
-        no_cup_brightness = np.mean(no_cup_stats[1])
-        brightness_diff = abs(cup_brightness - no_cup_brightness)
-        
-        print(f"\n💡 Сравнение яркости:")
-        print(f"  Кружки: {cup_brightness:.1f}")
-        print(f"  Не-кружки: {no_cup_brightness:.1f}")
-        print(f"  Разность: {brightness_diff:.1f}")
-        
-        if brightness_diff < 10:
-            print("⚠️ ПРОБЛЕМА: Очень похожая яркость между классами!")
-    
-    return files_with_cups, files_without_cups
 
 def create_transfer_learning_model(input_shape=(224, 224, 3), num_classes=2):
     """
@@ -749,3 +664,4 @@ if __name__ == "__main__":
         print("✅ Хороший результат!")
     else:
         print("❌ Нужны улучшения...")
+
