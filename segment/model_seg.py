@@ -17,7 +17,28 @@ SAMPLE_SIZE = (256, 256)
 
 OUTPUT_SIZE = (1080, 1920)
 
+def load_images(image, mask):
+    image = tf.io.read_file(image)
+    image = tf.io.decode_jpeg(image)
+    image = tf.image.resize(image, OUTPUT_SIZE)
+    image = tf.image.convert_image_dtype(image, tf.float32)
+    image = image / 255.0
+    
+    mask = tf.io.read_file(mask)
+    mask = tf.io.decode_png(mask)
+    mask = tf.image.rgb_to_grayscale(mask)
+    mask = tf.image.resize(mask, OUTPUT_SIZE)
+    mask = tf.image.convert_image_dtype(mask, tf.float32)
+    
+    masks = []
+    
+    for i in range(CLASSES):
+        masks.append(tf.where(tf.equal(mask, float(i)), 1.0, 0.0))
+    
+    masks = tf.stack(masks, axis=2)
+    masks = tf.reshape(masks, OUTPUT_SIZE + (CLASSES,))
 
+    return image, masks
 
 def augmentate_images(image, masks):   
     random_crop = tf.random.uniform((), 0.3, 1)
@@ -176,4 +197,5 @@ unet_like.compile(optimizer='adam', loss=[dice_bce_mc_loss], metrics=[dice_mc_me
 history_dice = unet_like.fit(train_dataset, validation_data=test_dataset, epochs=25, initial_epoch=0)
 
 unet_like.save_weights('unet_like')
+
 
